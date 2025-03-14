@@ -6,6 +6,7 @@ Created on Wed Mar 12 12:21:58 2025
 @author: azelcer
 """
 import logging as _lgn
+import json as _json
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject, Qt, QTimer
 from PyQt5.QtGui import QDoubleValidator
 from PyQt5.QtWidgets import (
@@ -21,7 +22,6 @@ from PyQt5.QtWidgets import (
 )
 import numpy as np
 import pyqtgraph as _pg
-
 _lgr = _lgn.getLogger(__name__)
 _lgr.setLevel(_lgn.DEBUG)
 
@@ -44,33 +44,24 @@ def text2list(txt: str) -> np.ndarray:
     return np.array((x, y, t))
 
 
-# def list2txt(positions: list[tuple[float, float, float]]) -> str:
-#     """Transforma un array de Nx3 en un texto."""
-#     returrn '\n'.join([str()])
-#     for pos in data:
-#         originalline = line
-#         line = line.replace(';', ' ').strip()
-#         if not line:
-#             continue
-#         _ = line.split()
-#         if len(_) != 3:
-#             raise ValueError(f'Can not interpret "{originalline}" as a 3-tuple')
-#         for orig, dest in zip(_, (x, y, t)):
-#             value = float(orig)  # raises the proper exception
-#             dest.append(value)
-#     return np.array((x, y, t))
+def list2txt(positions: list[tuple[float, float, float]]) -> str:
+    """Transforma un array de Nx3 en un texto."""
+    return '\n'.join([' '.join([str(c) for c in p]) for p in positions])
+
 
 class PatternWindow(QFrame):
     """Window for defining a shift pattern."""
 
-    def __init__(self, parent, *args, **kwargs):
+    def __init__(self, stabilizer, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # self.setWindowFlag(Qt.WindowCloseButtonHint, False)
-        self._init_gui(parent)
+        self._stabilizer =  stabilizer
+        self._init_gui()
         self._timer = QTimer()
         self._timer.timeout.connect(self.click)
+        self.setWindowTitle('Patterns')
 
-    def _init_gui(self, parent):
+    def _init_gui(self):
         self.setWindowTitle("Patterns")
         layout = QHBoxLayout()
 
@@ -81,10 +72,14 @@ class PatternWindow(QFrame):
         L_layout = QHBoxLayout()
         L_layout.addWidget(QLabel("L / nm"))
         self._length_le = QLineEdit("10.0")
+        self._length_le.setValidator(QDoubleValidator(0, 200., 2))
         L_layout.addWidget(self._length_le)
         self.parseButton = QPushButton('Process pattern')
         self.parseButton.clicked.connect(self._interpret)
-        self._length_le.setValidator(QDoubleValidator(0, 100., 2))
+        self.loadButton = QPushButton('Load pattern')
+        self.loadButton.clicked.connect(lambda: self._do_load('/tmp/pattern.json'))  # TODO: use dialog
+        self.saveButton = QPushButton('Save pattern')
+        self.saveButton.clicked.connect(lambda: self._do_save('/tmp/pattern.json'))  # TODO: use dialog
         self.startButton = QPushButton('Start')
         self.startButton.clicked.connect(self._start)
         self.stopButton = QPushButton('Stop')
@@ -93,6 +88,8 @@ class PatternWindow(QFrame):
         definition_layout.addWidget(self.points_te)
         definition_layout.addLayout(L_layout)
         definition_layout.addWidget(self.parseButton)
+        definition_layout.addWidget(self.loadButton)
+        definition_layout.addWidget(self.saveButton)
         definition_layout.addWidget(self.startButton)
         definition_layout.addWidget(self.stopButton)
         definition_gb.setFlat(True)
@@ -114,13 +111,13 @@ class PatternWindow(QFrame):
         self.setLayout(layout)
 
     def _start(self):
-        puntos = self._interpret()
-        if not puntos:
+        points = self._interpret()
+        if not points:
             _lgr.info("Wrong format for positions list")
             return
 
-        self._points = np.array(puntos['positions'])
-        self._points[:, 0:2] *= puntos['L']
+        self._points = np.array(points['positions'])
+        self._points[:, 0:2] *= points['L']
         self._timer.setInterval(0)
         self._current_step = 0
         self.startButton.setEnabled(False)
@@ -138,35 +135,57 @@ class PatternWindow(QFrame):
         """Move to next step or end."""
         if self._current_step >= len(self._points):
             self._finish_pattern()
-            print("Listo")
+            _lgr.info("Pattern finished")
             return
-        print("mover a ", self._points[self._current_step][0:2])
+        self._stabilizer.shift_reference(*self._points[self._current_step][0:2], 0.)
         self._timer.setInterval(int(self._points[self._current_step, 2] * 1000))
         self._current_step += 1
 
     def _interpret(self):
         try:
             x, y, t = text2list(self.points_te.toPlainText())
-            print(x, y, t)
             L = float(self._length_le.text())
             rv = {"L": L, 'positions': [v for v in zip(x, y, t)]}
-            print(rv)
             self.xyDataItem.setData(np.array(x) * L, np.array(y) * L)
             return rv
-
         except Exception as e:
-            print("error en el texto: ", e, type(e))
+            _lgr.warning("Error %s parsing text: %s", type(e), e, )
+            raise
+
+    def _do_load(self, filename: str):
+        """Load and check pattern definition."""
+        with open(filename, "rt") as fd:
+            data = _json.load(fd)
+        # Everything raises the expected exceptions, so no handling
+        L = data['L']
+        pos = data['positions']
+        for p in pos:
+            if len(p) != 3:
+                _lgr.error("Invalid data length in file: %s", p)
+                return
+        self.points_te.setText(list2txt(pos))
+        self._length_le.setText(str(L))
+
+    def _do_save(self, filename: str):
+        """Save pattern definition."""
+        data = self._interpret()
+        with open(filename, "wt") as fd:
+            data = _json.dump(data, fd)
 
 
 if __name__ == '__main__':
     from PyQt5.QtWidgets import QApplication
+
+    class DummyStabilizer:
+        def shift_reference(self, dx: float, dy: float, dz: float):
+            print("shift reference by", dx, dy)
 
     if not QApplication.instance():
         app = QApplication([])
     else:
         app = QApplication.instance()
 
-    gui = PatternWindow(None)
+    gui = PatternWindow(DummyStabilizer())
     gui.setWindowTitle('E.A.E.A.P.P')
     gui.show()
     gui.raise_()
