@@ -23,7 +23,7 @@ Copyright (C) 2025 Andrés Zelcer and others
 import logging as _lgn
 import json as _json
 from typing import List as _List, Tuple as _Tuple
-from PyQt5.QtCore import pyqtSlot, QTimer
+from PyQt5.QtCore import pyqtSlot, QTimer, Qt
 from PyQt5.QtGui import QDoubleValidator
 from PyQt5.QtWidgets import (
     QGroupBox,
@@ -69,9 +69,9 @@ def list2txt(positions: _List[_Tuple[float, float, float]]) -> str:
 class PatternWindow(QFrame):
     """Window for defining a shift pattern."""
 
-    def __init__(self, stabilizer, *args, **kwargs):
+    def __init__(self, parent, stabilizer, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # self.setWindowFlag(Qt.WindowCloseButtonHint, False)
+        self.setWindowFlag(Qt.WindowCloseButtonHint, False)
         self._stabilizer = stabilizer
         self._init_gui()
         self._timer = QTimer()

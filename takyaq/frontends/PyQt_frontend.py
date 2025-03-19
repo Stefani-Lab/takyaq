@@ -55,7 +55,7 @@ import logging as _lgn
 from ..stabilizer import Stabilizer, PointInfo, ROI, CameraInfo
 
 import takyaq.base_classes as _bc
-
+from .pattern_GUI import PatternWindow
 
 _lgr = _lgn.getLogger(__name__)
 _lgr.setLevel(_lgn.DEBUG)
@@ -354,6 +354,8 @@ class Frontend(QFrame):
         self._set_delay(True)
         self._config_window = ConfigWindow(self, controller)
         self._config_window.hide()
+        self._pattern_window = PatternWindow(self, stabilizer)
+        self._pattern_window.hide()
 
     def _load_config(self):
         self._config = load_config()
@@ -784,6 +786,10 @@ class Frontend(QFrame):
         self.toggle_options_button.clicked.connect(self._toggle_options_window)
         self.toggle_options_button.setEnabled(True)
         self.toggle_options_button.setCheckable(True)
+        self.toggle_pattern_button = QPushButton("Show pattern Window")
+        self.toggle_pattern_button.clicked.connect(self._toggle_pattern_window)
+        self.toggle_pattern_button.setEnabled(True)
+        self.toggle_pattern_button.setCheckable(True)
 
         # Tracking control
         trackgb = QGroupBox("Track")
@@ -886,6 +892,7 @@ class Frontend(QFrame):
         param_layout.addWidget(self.zROIButton)
         param_layout.addWidget(self.delete_roiButton)
         param_layout.addWidget(self.toggle_options_button)
+        param_layout.addWidget(self.toggle_pattern_button)
 
         param_layout.addWidget(trackgb)
         param_layout.addWidget(lockgb)
@@ -988,6 +995,15 @@ class Frontend(QFrame):
         else:
             self.toggle_options_button.setText("Show options window")
             self._config_window.hide()
+
+    @pyqtSlot(bool)
+    def _toggle_pattern_window(self, checked: bool):
+        if checked:
+            self.toggle_pattern_button.setText("Hide pattern window")
+            self._pattern_window.show()
+        else:
+            self.toggle_pattern_button.setText("Show pattern window")
+            self._pattern_window.hide()
 
     def closeEvent(self, *args, **kwargs):
         """Shut down stabilizer on exit."""
