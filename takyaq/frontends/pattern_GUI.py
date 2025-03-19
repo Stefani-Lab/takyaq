@@ -1,20 +1,36 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Mar 12 12:21:58 2025
+Pattern generation window.
 
-@author: azelcer
+TODO: Use QTableWidget for position definition.
+
+Copyright (C) 2025 Andrés Zelcer and others
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as
+    published by the Free Software Foundation, either version 3 of the
+    License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import logging as _lgn
 import json as _json
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, QObject, Qt, QTimer
+from typing import List as _List, Tuple as _Tuple
+from PyQt5.QtCore import pyqtSlot, QTimer
 from PyQt5.QtGui import QDoubleValidator
 from PyQt5.QtWidgets import (
     QGroupBox,
     QFrame,
     QLabel,
     QPushButton,
-    QCheckBox,
+    QFileDialog,
     QHBoxLayout,
     QVBoxLayout,
     QLineEdit,
@@ -24,6 +40,7 @@ import numpy as np
 import pyqtgraph as _pg
 _lgr = _lgn.getLogger(__name__)
 _lgr.setLevel(_lgn.DEBUG)
+
 
 def text2list(txt: str) -> np.ndarray:
     """Transforma un texto en un array de Nx3."""
@@ -44,7 +61,7 @@ def text2list(txt: str) -> np.ndarray:
     return np.array((x, y, t))
 
 
-def list2txt(positions: list[tuple[float, float, float]]) -> str:
+def list2txt(positions: _List[_Tuple[float, float, float]]) -> str:
     """Transforma un array de Nx3 en un texto."""
     return '\n'.join([' '.join([str(c) for c in p]) for p in positions])
 
@@ -55,7 +72,7 @@ class PatternWindow(QFrame):
     def __init__(self, stabilizer, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # self.setWindowFlag(Qt.WindowCloseButtonHint, False)
-        self._stabilizer =  stabilizer
+        self._stabilizer = stabilizer
         self._init_gui()
         self._timer = QTimer()
         self._timer.timeout.connect(self.click)
@@ -77,9 +94,9 @@ class PatternWindow(QFrame):
         self.parseButton = QPushButton('Process pattern')
         self.parseButton.clicked.connect(self._interpret)
         self.loadButton = QPushButton('Load pattern')
-        self.loadButton.clicked.connect(lambda: self._do_load('/tmp/pattern.json'))  # TODO: use dialog
+        self.loadButton.clicked.connect(self.load_dialog)
         self.saveButton = QPushButton('Save pattern')
-        self.saveButton.clicked.connect(lambda: self._do_save('/tmp/pattern.json'))  # TODO: use dialog
+        self.saveButton.clicked.connect(self.save_dialog)
         self.startButton = QPushButton('Start')
         self.startButton.clicked.connect(self._start)
         self.stopButton = QPushButton('Stop')
@@ -152,6 +169,25 @@ class PatternWindow(QFrame):
             _lgr.warning("Error %s parsing text: %s", type(e), e, )
             raise
 
+    @pyqtSlot(bool)
+    def load_dialog(self, clicked: bool):
+        filename = QFileDialog.getOpenFileName(
+            self, "Select pattern", "", "json files (*.json);;all files (*.*)")
+        if filename[0]:
+            try:
+                self._do_load(filename[0])
+                self._interpret()
+            except Exception as e:
+                _lgr.warning("Error %s (%s) opening and interpreting file %s",
+                             type(e), e, filename[0])
+
+    @pyqtSlot(bool)
+    def save_dialog(self, clicked: bool):
+        filename = QFileDialog.getSaveFileName(
+            self, "Save pattern", "pattern.json", "json files (*.json);;all files (*.*)")
+        if filename[0]:
+            self._do_save(filename[0])
+
     def _do_load(self, filename: str):
         """Load and check pattern definition."""
         with open(filename, "rt") as fd:
@@ -178,7 +214,7 @@ if __name__ == '__main__':
 
     class DummyStabilizer:
         def shift_reference(self, dx: float, dy: float, dz: float):
-            print("shift reference by", dx, dy)
+            print("Set shift reference to", dx, dy)
 
     if not QApplication.instance():
         app = QApplication([])
@@ -186,7 +222,6 @@ if __name__ == '__main__':
         app = QApplication.instance()
 
     gui = PatternWindow(DummyStabilizer())
-    gui.setWindowTitle('E.A.E.A.P.P')
     gui.show()
     gui.raise_()
     gui.activateWindow()
