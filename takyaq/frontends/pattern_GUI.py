@@ -22,6 +22,7 @@ Copyright (C) 2025 Andrés Zelcer and others
 """
 import logging as _lgn
 import json as _json
+from itertools import repeat as _repeat, product as _product
 from typing import List as _List, Tuple as _Tuple
 from PyQt5.QtCore import pyqtSlot, QTimer, Qt
 from PyQt5.QtGui import QDoubleValidator
@@ -65,6 +66,16 @@ def text2list(txt: str) -> np.ndarray:
 def list2txt(positions: _List[_Tuple[float, float, float]]) -> str:
     """Transforma un array de Nx3 en un texto."""
     return '\n'.join([' '.join([str(c) for c in p]) for p in positions])
+
+
+def _create_square_array(n_points: int, L: float, period: float):
+    """Create a square grid vertexes with the same residence time.
+
+    Note that n_points vertexes give n_points-1 spaces.
+    """
+    rng = np.linspace(0, 1, n_points)
+    rv = [(x, y, t) for (y, x), t in zip(_product(rng, rng), _repeat(period))]
+    return {"L": L, "positions": rv}
 
 
 class PatternWindow(QFrame):
@@ -152,7 +163,7 @@ class PatternWindow(QFrame):
     def _goto_rest_reference(self):
         """Goes back to rest reference."""
         if not self._timer.isActive():
-            if self._use_extra_chkbx.isChecked() != 0:
+            if self._use_extra_chkbx.isChecked():
                 self._stabilizer.shift_reference(*self._read_xtras(), 0.)
             else:
                 self._stabilizer.shift_reference(0., 0., 0.)
@@ -176,10 +187,12 @@ class PatternWindow(QFrame):
         if not len(self._points):
             _lgr.warning("Empty position list")
             return
-        try:
-            shift_x, shift_y = self._read_xtras()
-        except Exception as e:
-            _lgr.warning("Invalid extra shift: %s (%s)", type(e), e)
+        shift_x, shift_y = (0., 0.)
+        if self._use_extra_chkbx.isChecked():
+            try:
+                shift_x, shift_y = self._read_xtras()
+            except Exception as e:
+                _lgr.warning("Invalid extra shift: %s (%s)", type(e), e)
         self._points[:, 0:2] *= points['L']
         self._points[:, 0] += shift_x
         self._points[:, 1] += shift_y
