@@ -96,7 +96,7 @@ class WrappedPiezo(Baseiezo):
        self._motor.init()
 
     def close(self):
-        self._motor.init()
+        self._motor.shutdown()
 
     def set_position_xy(self, x: float, y: float):
         self._motor.move_to('X', x / 1E3)
