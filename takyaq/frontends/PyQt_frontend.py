@@ -1011,4 +1011,5 @@ class Frontend(QFrame):
         if self._save_data:
             self._change_save(Qt.CheckState.Unchecked)
         self._config_window.close()
+        self._pattern_window.close()
         super().closeEvent(*args, **kwargs)

@@ -35,6 +35,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QLineEdit,
     QTextEdit,
+    QCheckBox,
 )
 import numpy as np
 import pyqtgraph as _pg
@@ -71,7 +72,8 @@ class PatternWindow(QFrame):
 
     def __init__(self, parent, stabilizer, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.setWindowFlag(Qt.WindowCloseButtonHint, False)
+        if parent:
+            self.setWindowFlag(Qt.WindowCloseButtonHint, False)
         self._stabilizer = stabilizer
         self._init_gui()
         self._timer = QTimer()
@@ -91,24 +93,44 @@ class PatternWindow(QFrame):
         self._length_le = QLineEdit("10.0")
         self._length_le.setValidator(QDoubleValidator(0, 200., 2))
         L_layout.addWidget(self._length_le)
+        xtra_gb = QGroupBox("Extra shift / nm")
+        xtra_shift_layout = QHBoxLayout()
+        xtra_gb.setLayout(xtra_shift_layout)
+        self._use_extra_chkbx = QCheckBox("Use")
+        self._use_extra_chkbx.stateChanged.connect(self._handle_use_toggle)
+        xtra_shift_layout.addWidget(self._use_extra_chkbx)
+        self.xtra_x_le = QLineEdit("0.0")
+        self.xtra_x_le.setValidator(QDoubleValidator(-200., 200., 1))
+        self.xtra_y_le = QLineEdit("0.0")
+        self.xtra_y_le.setValidator(QDoubleValidator(-200., 200., 1))
+        xtra_shift_layout.addWidget(QLabel("x"))
+        xtra_shift_layout.addWidget(self.xtra_x_le)
+        xtra_shift_layout.addWidget(QLabel("y"))
+        xtra_shift_layout.addWidget(self.xtra_y_le)
         self.parseButton = QPushButton('Process pattern')
         self.parseButton.clicked.connect(self._interpret)
         self.loadButton = QPushButton('Load pattern')
         self.loadButton.clicked.connect(self.load_dialog)
         self.saveButton = QPushButton('Save pattern')
         self.saveButton.clicked.connect(self.save_dialog)
+        load_save_layout = QHBoxLayout()
+        load_save_layout.addWidget(self.loadButton)
+        load_save_layout.addWidget(self.saveButton)
         self.startButton = QPushButton('Start')
         self.startButton.clicked.connect(self._start)
         self.stopButton = QPushButton('Stop')
         self.stopButton.setEnabled(False)
         self.stopButton.clicked.connect(self._finish_pattern)
+        start_stop_layout = QHBoxLayout()
+        start_stop_layout.addWidget(self.startButton)
+        start_stop_layout.addWidget(self.stopButton)
+
         definition_layout.addWidget(self.points_te)
         definition_layout.addLayout(L_layout)
+        definition_layout.addWidget(xtra_gb)
         definition_layout.addWidget(self.parseButton)
-        definition_layout.addWidget(self.loadButton)
-        definition_layout.addWidget(self.saveButton)
-        definition_layout.addWidget(self.startButton)
-        definition_layout.addWidget(self.stopButton)
+        definition_layout.addLayout(load_save_layout)
+        definition_layout.addLayout(start_stop_layout)
         definition_gb.setFlat(True)
         self.xyPoint = _pg.GraphicsLayoutWidget()
         self.xyPoint.resize(400, 400)
@@ -127,6 +149,23 @@ class PatternWindow(QFrame):
         layout.addWidget(self.xyPoint)
         self.setLayout(layout)
 
+    def _goto_rest_reference(self):
+        """Goes back to rest reference."""
+        if not self._timer.isActive():
+            if self._use_extra_chkbx.isChecked() != 0:
+                self._stabilizer.shift_reference(*self._read_xtras(), 0.)
+            else:
+                self._stabilizer.shift_reference(0., 0., 0.)
+
+    @pyqtSlot(int)
+    def _handle_use_toggle(self, state: int):
+        self.xtra_x_le.setEnabled(state == 0)
+        self.xtra_y_le.setEnabled(state == 0)
+        self._goto_rest_reference()
+
+    def _read_xtras(self):
+       return float(self.xtra_x_le.text()), float(self.xtra_y_le.text())
+
     def _start(self):
         points = self._interpret()
         if not points:
@@ -134,7 +173,16 @@ class PatternWindow(QFrame):
             return
 
         self._points = np.array(points['positions'])
+        if not len(self._points):
+            _lgr.warning("Empty position list")
+            return
+        try:
+            shift_x, shift_y = self._read_xtras()
+        except Exception as e:
+            _lgr.warning("Invalid extra shift: %s (%s)", type(e), e)
         self._points[:, 0:2] *= points['L']
+        self._points[:, 0] += shift_x
+        self._points[:, 1] += shift_y
         self._timer.setInterval(0)
         self._current_step = 0
         self.startButton.setEnabled(False)
@@ -146,6 +194,7 @@ class PatternWindow(QFrame):
         self._timer.stop()
         self.startButton.setEnabled(True)
         self.stopButton.setEnabled(False)
+        self._goto_rest_reference()
 
     @pyqtSlot()
     def click(self):
@@ -221,7 +270,7 @@ if __name__ == '__main__':
     else:
         app = QApplication.instance()
 
-    gui = PatternWindow(DummyStabilizer())
+    gui = PatternWindow(None, DummyStabilizer())
     gui.show()
     gui.raise_()
     gui.activateWindow()
