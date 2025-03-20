@@ -45,7 +45,11 @@ _lgr.setLevel(_lgn.DEBUG)
 
 
 def text2list(txt: str) -> np.ndarray:
-    """Transforma un texto en un array de Nx3."""
+    r"""Interpret a text as an Nx3 array.
+
+    Expects empty spaces (' ', '\t') or semicolons as spacers. We avoid commas as
+    spacers as it is the decimal separator in many languages.
+    """
     x = []
     y = []
     t = []
@@ -64,7 +68,7 @@ def text2list(txt: str) -> np.ndarray:
 
 
 def list2txt(positions: _List[_Tuple[float, float, float]]) -> str:
-    """Transforma un array de Nx3 en un texto."""
+    """Render an Nx3 array as text."""
     return '\n'.join([' '.join([str(c) for c in p]) for p in positions])
 
 
@@ -99,6 +103,11 @@ class PatternWindow(QFrame):
         definition_layout = QVBoxLayout()
         definition_gb.setLayout(definition_layout)
         self.points_te = QTextEdit()
+        self.points_te.setToolTip(
+            """Enter a list of vertexes for the pattern, one vertex per line.
+Each vertex is specified by 3 numbers separated by spaces: x shift, y shift and residence time.
+Shifts are specified in units of the the 'L' parameter, and time is in seconds."""
+        )
         L_layout = QHBoxLayout()
         L_layout.addWidget(QLabel("L / nm"))
         self._length_le = QLineEdit("10.0")
@@ -161,7 +170,11 @@ class PatternWindow(QFrame):
         self.setLayout(layout)
 
     def _goto_rest_reference(self):
-        """Goes back to rest reference."""
+        """Goes back to rest reference, unless a pattern is being executed.
+
+        Rest point is 0,0 if extra shift is not enabled, or whatever the user selected
+        if enabled.
+        """
         if not self._timer.isActive():
             if self._use_extra_chkbx.isChecked():
                 self._stabilizer.shift_reference(*self._read_xtras(), 0.)
@@ -170,19 +183,21 @@ class PatternWindow(QFrame):
 
     @pyqtSlot(int)
     def _handle_use_toggle(self, state: int):
+        """"Handle 'Use extra shift' checkbox toggle."""
         self.xtra_x_le.setEnabled(state == 0)
         self.xtra_y_le.setEnabled(state == 0)
         self._goto_rest_reference()
 
-    def _read_xtras(self):
-       return float(self.xtra_x_le.text()), float(self.xtra_y_le.text())
+    def _read_xtras(self) -> _Tuple[float, float]:
+        """Read user entered extra shift position."""
+        return float(self.xtra_x_le.text()), float(self.xtra_y_le.text())
 
     def _start(self):
+        """Start moving."""
         points = self._interpret()
         if not points:
             _lgr.info("Wrong format for positions list")
             return
-
         self._points = np.array(points['positions'])
         if not len(self._points):
             _lgr.warning("Empty position list")
@@ -203,7 +218,7 @@ class PatternWindow(QFrame):
         self._timer.start()
 
     def _finish_pattern(self):
-        """Stop timer and restore buttons."""
+        """Stop timer, restore buttons and reset position."""
         self._timer.stop()
         self.startButton.setEnabled(True)
         self.stopButton.setEnabled(False)
@@ -211,7 +226,10 @@ class PatternWindow(QFrame):
 
     @pyqtSlot()
     def click(self):
-        """Move to next step or end."""
+        """Handle each point in the pattern.
+
+        Move to next step or finish.
+        """
         if self._current_step >= len(self._points):
             self._finish_pattern()
             _lgr.info("Pattern finished")
@@ -220,7 +238,8 @@ class PatternWindow(QFrame):
         self._timer.setInterval(int(self._points[self._current_step, 2] * 1000))
         self._current_step += 1
 
-    def _interpret(self):
+    def _interpret(self) -> dict:
+        """Produce a pattern dict from user provided data."""
         try:
             x, y, t = text2list(self.points_te.toPlainText())
             L = float(self._length_le.text())
@@ -233,6 +252,7 @@ class PatternWindow(QFrame):
 
     @pyqtSlot(bool)
     def load_dialog(self, clicked: bool):
+        """Load file dialog."""
         filename = QFileDialog.getOpenFileName(
             self, "Select pattern", "", "json files (*.json);;all files (*.*)")
         if filename[0]:
@@ -245,6 +265,7 @@ class PatternWindow(QFrame):
 
     @pyqtSlot(bool)
     def save_dialog(self, clicked: bool):
+        """Save file dialog."""
         filename = QFileDialog.getSaveFileName(
             self, "Save pattern", "pattern.json", "json files (*.json);;all files (*.*)")
         if filename[0]:
