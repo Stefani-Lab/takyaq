@@ -183,7 +183,7 @@ Shifts are specified in units of the the 'L' parameter, and time is in seconds."
 
     @pyqtSlot(int)
     def _handle_use_toggle(self, state: int):
-        """"Handle 'Use extra shift' checkbox toggle."""
+        """Handle 'Use extra shift' checkbox toggle."""
         self.xtra_x_le.setEnabled(state == 0)
         self.xtra_y_le.setEnabled(state == 0)
         self._goto_rest_reference()
