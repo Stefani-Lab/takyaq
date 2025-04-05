@@ -426,6 +426,11 @@ class Stabilizer(_th.Thread):
             return self.enable_xy_tracking()
         return self.disable_xy_tracking()
 
+    @property
+    def is_xy_tracking_enabled(self) -> bool:
+        """Whether tracking is enabled."""
+        return self._xy_tracking
+
     def _report_end_stabilization(self, st_type: StabilizationType,
                                   idx_end: int = None):
         """Call the stabilization en callbacks up to idx.
@@ -477,6 +482,11 @@ class Stabilizer(_th.Thread):
             return self.enable_xy_stabilization()
         return self.disable_xy_stabilization()
 
+    @property
+    def is_xy_stabilization_enabled(self) -> bool:
+        """Whether stabilization is enabled."""
+        return self._xy_stabilization
+
     def enable_z_tracking(self) -> bool:
         """Enable tracking of Z position."""
         if self._z_roi is None:
@@ -500,6 +510,12 @@ class Stabilizer(_th.Thread):
         if enabled:
             return self.enable_z_tracking()
         return self.disable_z_tracking()
+
+    @property
+    def is_z_tracking_enabled(self) -> bool:
+        """Whether tracking is enabled."""
+        return self._z_tracking
+
 
     def enable_z_stabilization(self) -> bool:
         """Enable stabilization of Z position."""
@@ -533,6 +549,11 @@ class Stabilizer(_th.Thread):
         self._report_end_stabilization(StabilizationType.Z_stabilization)
         self._z_stabilization = False
         return True
+
+    @property
+    def is_z_stabilization_enabled(self) -> bool:
+        """Whether stabilization is enabled."""
+        return self._z_stabilization
 
     def calibrate(self, direction: str) -> bool:
         """Perform calibration of pixel size."""

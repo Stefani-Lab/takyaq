@@ -45,6 +45,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QLineEdit,
     QDoubleSpinBox,
+    QFileDialog,
 )
 from PyQt5.QtGui import QDoubleValidator
 from .qt_utils import create_spin as _create_spin, GroupedCheckBoxes
@@ -55,14 +56,14 @@ import logging as _lgn
 from ..stabilizer import Stabilizer, PointInfo, ROI, CameraInfo
 
 import takyaq.base_classes as _bc
-
+from .pattern_GUI import PatternWindow
 
 _lgr = _lgn.getLogger(__name__)
 _lgr.setLevel(_lgn.DEBUG)
 
 # default configuration filename
 _CONFIG_FILENAME = 'takyaq.ini'
-_Z_LOCK_FILENAME = "z_lock.cfg"
+_Z_LOCK_FILENAME = "z_lock"
 
 _DEFAULT_CONFIG = {
         'display_points': 400,
@@ -173,7 +174,7 @@ def load_camera_info(filename: str = _CONFIG_FILENAME) -> CameraInfo:
     return CameraInfo(nm_ppx_xy, nm_ppx_z, angle)
 
 
-def save_z_lock(x: float, y: float, roi: ROI):
+def save_z_lock(filename: str, x: float, y: float, roi: ROI):
     """Save z lock data to file."""
     config = _ConfigParser()
     config["Z lock"] = {
@@ -186,16 +187,16 @@ def save_z_lock(x: float, y: float, roi: ROI):
         'min_y': roi.min_y,
         'max_y': roi.max_y,
         }
-    with open(_Z_LOCK_FILENAME, "wt") as configfile:
+    with open(filename, "wt") as configfile:
         config.write(configfile)
-        _lgr.info("Z lock data saved to %s", _Z_LOCK_FILENAME)
+        _lgr.info("Z lock data saved to %s", filename)
 
 
-def load_z_lock() -> _Tuple[float, float, ROI]:
+def load_z_lock(filename: str) -> _Tuple[float, float, ROI]:
     """Load z lock data from file."""
     config = _ConfigParser()
-    if not config.read(_Z_LOCK_FILENAME):
-        _lgr.warning("Z lock file not found")
+    if not config.read(filename):
+        _lgr.warning("Z lock file %s not found", filename)
         raise FileNotFoundError
     z_data = config["Z lock"]
     x = z_data.getfloat('x')
@@ -354,6 +355,8 @@ class Frontend(QFrame):
         self._set_delay(True)
         self._config_window = ConfigWindow(self, controller)
         self._config_window.hide()
+        self._pattern_window = PatternWindow(self, stabilizer)
+        self._pattern_window.hide()
 
     def _load_config(self):
         self._config = load_config()
@@ -637,15 +640,24 @@ class Frontend(QFrame):
         """Save Z lock position to file."""
         try:
             x, y, roi = self._stabilizer.get_z_lock()
-            save_z_lock(x, y, roi)
+            filename = _Z_LOCK_FILENAME +_datetime.date.today().isoformat() + '.cfg'
+            filename = QFileDialog.getSaveFileName(
+                self, "Save lock", filename, "cfg files (*.cfg);;all files (*.*)")
+            if filename[0]:
+                save_z_lock(filename[0], x, y, roi)
         except ValueError:
             _lgr.warning("Can not save: Z has not been locked")
 
     @pyqtSlot(bool)
     def _load_z_lock(self, clicked: bool):
         """Load Z lock position to file."""
+        filename = QFileDialog.getOpenFileName(
+            self, "Load lock", "", "cfg files (*.cfg);;all files (*.*)")
+        if not filename[0]:
+            _lgr.info("No filename")
+            return
         try:
-            x, y, roi = load_z_lock()
+            x, y, roi = load_z_lock(filename[0])
         except FileNotFoundError:
             _lgr.warning("Can not load: Z locked file not found")
             return
@@ -788,6 +800,10 @@ class Frontend(QFrame):
         self.toggle_options_button.clicked.connect(self._toggle_options_window)
         self.toggle_options_button.setEnabled(True)
         self.toggle_options_button.setCheckable(True)
+        self.toggle_pattern_button = QPushButton("Show pattern Window")
+        self.toggle_pattern_button.clicked.connect(self._toggle_pattern_window)
+        self.toggle_pattern_button.setEnabled(True)
+        self.toggle_pattern_button.setCheckable(True)
 
         # Tracking control
         trackgb = QGroupBox("Track")
@@ -890,6 +906,7 @@ class Frontend(QFrame):
         param_layout.addWidget(self.zROIButton)
         param_layout.addWidget(self.delete_roiButton)
         param_layout.addWidget(self.toggle_options_button)
+        param_layout.addWidget(self.toggle_pattern_button)
 
         param_layout.addWidget(trackgb)
         param_layout.addWidget(lockgb)
@@ -996,10 +1013,20 @@ class Frontend(QFrame):
             self.toggle_options_button.setText("Show options window")
             self._config_window.hide()
 
+    @pyqtSlot(bool)
+    def _toggle_pattern_window(self, checked: bool):
+        if checked:
+            self.toggle_pattern_button.setText("Hide pattern window")
+            self._pattern_window.show()
+        else:
+            self.toggle_pattern_button.setText("Show pattern window")
+            self._pattern_window.hide()
+
     def closeEvent(self, *args, **kwargs):
         """Shut down stabilizer on exit."""
         _lgr.debug("Closing stabilization window")
         if self._save_data:
             self._change_save(Qt.CheckState.Unchecked)
         self._config_window.close()
+        self._pattern_window.close()
         super().closeEvent(*args, **kwargs)
