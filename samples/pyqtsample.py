@@ -37,7 +37,7 @@ from takyaq.frontends.PyQt_frontend import Frontend
 from takyaq.stabilizer import Stabilizer
 from PyQt5.QtWidgets import QApplication
 
-from takyaq.controllers import PIController
+from takyaq.controllers import PIController as PIController
 from takyaq.mocks import MockCamera, MockPiezo
 from takyaq.info_types import CameraInfo
 
@@ -66,7 +66,7 @@ if __name__ == "__main__":
         _CAMERA_XY_NMPPX * 7,  # en pixeles
         _CAMERA_Z_ROTATION,
         1,  # Center position noise in pixels
-        10,
+        40,
     )
     # Mock piezo motor, replace with your own
     piezo = MockPiezo(camera)
