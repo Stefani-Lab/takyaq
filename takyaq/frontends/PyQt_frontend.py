@@ -87,7 +87,7 @@ _NPY_Z_DTYPE = _np.dtype([
 def _has_method(obj, method_name: str) -> bool:
     """Check if an object implements a method, logging."""
     if not hasattr(obj, method_name):
-        _lgr.info("Method %s not present")
+        _lgr.debug("Method %s not present", method_name)
         return False
     if not callable(getattr(obj, method_name)):
         _lgr.error("Attribute %s is not a valid method", method_name)
