@@ -994,7 +994,7 @@ class Frontend(QFrame):
         main_layout.addLayout(bottom_layout)
 
     def goto_position(self, x, y, z):
-        """Move to a defined position."""
+        """Move to a defined position specified in µm."""
         self._stabilizer.move(x * 1E3, y * 1E3, z * 1E3)
 
     @pyqtSlot(bool)
