@@ -874,7 +874,7 @@ class Frontend(QFrame):
         numeric_layout.addWidget(self.set_delay_button, 0, 2)
         if _has_method(self._camera, 'set_exposure'):
             row = numeric_layout.rowCount()
-            self._exposure_sb = _create_spin(0.05, 3, 0.01, 0.01, 1.)
+            self._exposure_sb = _create_spin(0.05, 3, 0.01, 0.001, 1.)
             self._set_exposure_button = QPushButton('Set exposure')
             numeric_layout.addWidget(QLabel("Exposure / s",
                                             alignment=Qt.AlignRight + Qt.AlignVCenter), row, 0)

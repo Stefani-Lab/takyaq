@@ -55,7 +55,21 @@ class GroupedCheckBoxes:
 
 def create_spin(value: float, decimals: int, step: float,
                 minimum: float = 0., maximum: float = 1.):
-    """Create spin with properties."""
+    """Create spin with properties.
+
+    Parameters
+    ----------
+    value: float
+        Inital value
+    decimals: int
+        Number of decimals to show
+    step: float
+        Change on up/down click
+    minimum: float = 0.
+        Minimum allowed value.
+    maximum: float = 1.
+        Maximum allowed value.
+    """
     rv = QDoubleSpinBox()
     rv.setValue(value)
     rv.setDecimals(decimals)
