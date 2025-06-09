@@ -1,7 +1,7 @@
 # Takyaq
 
-Takyaq is a python module that stabilizes piezoelectric stages within few nm precision. It is is designed to be used in superresolution microscopy, altough it can be useful for many other applications, including photolithography.
-The module performance and is shown in the article XXXX.
+Takyaq is a python module that uses piezoelectric stages to achieve within sub nm 3D stabilization of samples. It is is designed to be used in superresolution microscopy, altough it can be useful for many other applications, including photolithography.
+The module performance is shown in the [article] *Open-source Sub-Nanometer Stabilization System for Super-resolution Fluorescence Microscopy*.
 
 
 ## Features
@@ -13,12 +13,14 @@ The module performance and is shown in the article XXXX.
 
 
 ## What is included
+
  - A stabilizer module.
  - A fully functional PyQt frontend that is more than an example.
  - Mock camera and piezo modules, so you can develop, test and try without real equipment.
  - Different stabilization strategies so you can choose your own withouth rolling your own.
  
 ## How to install
+
 Takyaq is not yet available in PyPi. Meanwhile installation and development is managed using [Poetry].
 Clone the repository, either using `ssh`:
 ```sh
@@ -50,7 +52,9 @@ Takyaq uses a number of open source projects to work properly:
 
 
 ## How to use
+
 ### Module
+
 Interfaces needed:
  - A camera object, that exposes a function named `get_image` and returns a single color image (a [NumPy] 2D array)
  - A piezo object, that must expose three functions
@@ -58,6 +62,7 @@ Interfaces needed:
    - One called `set_position_xy` that takes 2 arguments: the x and y positions where the stage should move *in nanometers*.
    - One called `set_position_z` that takes 1 arguments: the z position where the stage should move *in nanometers*.
 
+Note that the stabilization module internally uses nanometers for all distance measurements. On the contrary, the provided GUI uses µm on the "Move to" textboxes.
 
 The provided GUI will use some optional extra methods if implemented. The piezo object can optionally expose a method called `get_limits`, that takes no parameters and return a tuple of three pairs of floats, each pair representing the minimum and maximum values for X, Y and Z axes. The camera object can optionally expose methods called `set_exposure` and `set_gain`. Both methods take a single float parameter. For `set_exposure`, this value is the desired exposure time in seconds. For `set_gain`, the parameter is a value between 0 and 10. For each of these methods implemented in the object, the corresponding control will be available to set the parameter from the frontend.
 
@@ -75,13 +80,28 @@ The module communicates with other modules using callbacks. The callback procedu
 
 
 ### Stabilization strategies
-The program comes with some predefined stabilization strategies:
-  - PI
 
-You can implement your own strategies (for example ignoring fiduciary marks that have moved beyond a certain limit). Just see the `controllers` module for some examples.
+The software is designed to be used with different control systems. There are currently two included stabilization strategies:
+  - Basic PI controller.
+  - PI controller with outliers rejection.
+
+Both strategies perform well under normal scenarios. Nevertheless, it is easy to implement your own strategies with basic programming skills. Just see the `controllers` module for some examples. A brief explanation follows.
+
+#### Implementing response functions.
+
+Response functions are implemented as methods of “Controller” objects. The file `base\_classes.py` provides an abstract base class that can be used as a base to ensure consistency. A controller object must expose three methods:  
+`reset_x`: This method is called when XY stabilization is engaged. It is called with the number of XY ROIs (as an int) as its only parameter. The controller should initialize or reset its internal data, preparing for beginning stabilization on the XY axes.  
+`reset_z` : This method is called when Z stabilization is engaged. It is called without parameters. The controller should initialize or reset its internal data, preparing for beginning stabilization on the Z axis.
+`response`: This method is called on each stabilization cycle. it should return a 3-item tuple representing the response in X, Y and Z. Please note that a 3-tuple must be returned even if any stabilization is disabled. It receives 3 parameters:
+  - A float `t`, the timestamp of the localizations. It is the time as provided by Python’s `time.time()` call.  
+  - `xy_shifts`, an array of shape `(n_ROIS, 2)`. Each item of the array is the measured X and Y shift for each of the XY ROIS. If the localization of a particle failed (for example when the fitting procedure does not converge), the corresponding shifts will be `numpy.nan`, therefore the implementations must properly handle `nan` values. If XY stabilization is disabled, this parameter is `None.`  
+  - `z_shift`, a float: The shift on the Z axis.
+
+Note that the frontend provided is designed around the provided PI controller, and therefore expects the controllers to expose two extra methods: `set_Kp` and `set_Ki`. Both methods receive either a single float or a collection (tuple, list or array) of three floats. These methods are called when the corresponding values are set. If a single value is received, the same value should be used for all the axis. If a collection is received, the elements correspond to the value of the constant for the X, Y and Z  in order
 
 
 ### Adapting cameras and piezos.
+
 A piezo and a camera Abstract Base Class (ABC) are provided in the `base_classes` module. Use them to ensure that the method signatures are adecuate.
 
 Assume you have a piezo controller API that exposes functions that are called `move_to` that takes as parameter the axis as a string (`'X'`, `'Y'` or `'Z'`) and the new position in µm, and `get_pos` instead of `get_position`, that returns the values in micrometers. You can use a wrapper like this one:
@@ -117,9 +137,10 @@ piezo.close()
 
 
 ```
-Making a context manager is recommended (it is simple and very convenient).
+Making a [context manager] is recommended (it is simple and very convenient).
 
 ### PyQt frontend
+
 The provided PyQt frontend is a fully functional example of how to use the stabilization module. For most purposes, you can use it _as is_. You must provide:
  - A camera object.
  - A piezo object.
@@ -144,14 +165,17 @@ Calibration:
 
 
 ### Camera and piezo orientation
+
   Depending on the assembly, the camera X-Y axis can be switched, or one of them flipped. Correct this in the `camera` wrapper 
 
 
 ### Pixel sizes
+
 Be careful since the pixel sizes used and determined using the provided calibration are only self-consistent. If the stage calibration is incorrect, the program will report valid but incorrect values for the stabilization precision.
 
 
 ## Some design comments and pitfalls
+
  - We try to keep compatibility with Python 3.7+, to support legacy setups.
  - Times are reported in seconds since the Epoch, as provided by Python's `time.time()`, since it is the most convenient (not the best) way of having the same time reference between different programs.
  - The stabilization loop runs on a different thread. It could run on a different process for efficiency (to avoid GIL issues), but most applications need to be able to move the piezo from other modules. Managing the same stage from two different processes is usually much harder than from different threads on the same process.
@@ -163,10 +187,12 @@ Be careful since the pixel sizes used and determined using the provided calibrat
 As we don't want to worry about formatting, from time to time we let [black] do its job.
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
+Upstream development takes place in <https://github.com/azelcer/takyaq>. Please report bugss issues and requests there.
+
 
 ## Citing
 
-If you use this module or a derivation, please cite XXXX, and drop us a line.
+If you use this module or a derivation, please cite [article], and drop us a line.
 
 
 ## License
@@ -178,3 +204,5 @@ This module is distributed under GNU Affero General Public License v3.0 or later
    [Poetry]: <http://angularjs.org>
    [NumPy]: <https://numpy.org/>
    [black]: <https://black.readthedocs.io/en/stable/>
+   [article]: <https://dx.doi.org/10.21203/rs.3.rs-6131181/v1>
+   [context manager]: <https://docs.python.org/3/reference/datamodel.html#context-managers>
