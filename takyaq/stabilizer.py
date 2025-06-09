@@ -873,9 +873,8 @@ class Stabilizer(_th.Thread):
         initial_xy_positions = None
         self._initial_z_position = None
         self._pos[:] = self._piezo.get_position()
+        lt = _time.monotonic()  # or 0
         while not self._stop_event.is_set():
-            lt = _time.monotonic()
-            DELAY = self._period
             z_shift = 0.0
             xy_shifts = None
             # Check external events
@@ -905,6 +904,10 @@ class Stabilizer(_th.Thread):
                 self._pos[:] = self._moveto_pos
                 self._move_event.clear()
             # Tracking and stabilization starts here
+            nt = _time.monotonic()
+            delay = self._period - (nt - lt)
+            _time.sleep(max(delay, 0.001))  # be nice to other threads
+            lt = nt
             try:
                 image = self._camera.get_image()
                 t = _time.time()
@@ -974,7 +977,4 @@ class Stabilizer(_th.Thread):
                     self._move_relative_z(z_resp)
                 if self._xy_stabilization:
                     self._move_relative_xy(x_resp, y_resp)
-            nt = _time.monotonic()
-            delay = DELAY - (nt - lt)
-            _time.sleep(max(delay, 0.001))  # be nice to other threads
         _lgr.debug("Ending loop.")
