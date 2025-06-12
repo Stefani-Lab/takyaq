@@ -83,9 +83,9 @@ The module communicates with other modules using callbacks. The callback procedu
 
 The software is designed to be used with different control systems. There are currently two included stabilization strategies:
   - Basic PI controller.
-  - PI controller with outliers rejection.
+  - PI controller with outliers rejection, either using Z-score (MAD based) or standard deviation.
 
-Both strategies perform well under normal scenarios. Nevertheless, it is easy to implement your own strategies with basic programming skills. Just see the `controllers` module for some examples. A brief explanation follows.
+Both strategies perform well under normal scenarios. Nevertheless, it is easy to implement your own strategies with basic programming skills. A full example of how to implement a controller can be found in the samples folder. Morover, the implementations found in the `controllers` module are easy to understand. For the imaptient, a brief explanation follows.
 
 #### Implementing response functions.
 
