@@ -84,7 +84,7 @@ class MockCamera(BaseCamera):
     # f = True  # Camera fail first call flag
 
     def __init__(self, nmpp_x, nmpp_y, nmpp_z, sigma, z_ang: float, noise_level=3,
-                 drift_amplitude=3):
+                 drift_amplitude=3, background=1):
         """Init Mock camera.
 
         Parameters
@@ -103,6 +103,8 @@ class MockCamera(BaseCamera):
             Random shifts of XYZ positions in nm. The default is 3.
         drift_amplitude : float, optional
             Amplitude of the periodic shift in nm. The default is 3.
+        background: float
+            parameter for poisson noise
         """
         self._nl = noise_level
         self._drift = drift_amplitude
@@ -112,6 +114,7 @@ class MockCamera(BaseCamera):
         self._z_ang = z_ang
         self._rot_vec = _np.array((_np.cos(self._z_ang), _np.sin(self._z_ang),))
         self.sigma = sigma
+        self._pois_noise = background
 
     def get_image(self):
         """Return a faked image."""
@@ -157,8 +160,9 @@ class MockCamera(BaseCamera):
             self.grid[:, slicex, slicey], 100, r[0], r[1], self.sigma / self._nmpp_x, 0
         )
         rv *= self._gain
-        rv += _np.random.poisson(2, (self.max_x, self.max_y))
+        rv += _np.random.poisson(self._pois_noise, (self.max_x, self.max_y))
         rv *= (self._exposure / 0.05)  # 50ms default
+        _time.sleep(max(t + self._exposure - _time.monotonic(), 0))
         return rv.astype(_np.uint16)
 
     def shift(self, dx: float, dy: float, dz: float):

@@ -691,6 +691,12 @@ class Frontend(QFrame):
         # self._I_data[self._graph_pos] = _np.average(img)
         self._t_save_data[self._save_pos] = self._t_data[self._graph_pos] = t
         t_data = self._t_data[: self._graph_pos + 1] - self._t0
+        idt = 1/_np.diff(t_data)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self.freq_value.setText(
+                f"{_np.mean(idt):.2f} \u00B1  {_np.nanstd(idt):.2f}"
+            )
         # self.avgIntCurve.setData(t_data, self._I_data[: self._graph_pos + 1])
 
         # manage tracking data
@@ -919,15 +925,18 @@ class Frontend(QFrame):
         self.xstd_value = QLabel("00.00-00.00")
         self.ystd_value = QLabel("-")
         self.zstd_value = QLabel("-")
+        self.freq_value = QLabel("-")
 
         stat_subgrid = QGridLayout()
         self.statWidget.setLayout(stat_subgrid)
         stat_subgrid.addWidget(QLabel("\u03C3X/nm"), 0, 0)
         stat_subgrid.addWidget(QLabel("\u03C3Y/nm"), 1, 0)
         stat_subgrid.addWidget(QLabel("\u03C3Z/nm"), 2, 0)
+        stat_subgrid.addWidget(QLabel("freq./Hz"), 3, 0)
         stat_subgrid.addWidget(self.xstd_value, 0, 1)
         stat_subgrid.addWidget(self.ystd_value, 1, 1)
         stat_subgrid.addWidget(self.zstd_value, 2, 1)
+        stat_subgrid.addWidget(self.freq_value, 3, 1)
 
         self.statWidget.setMinimumSize(self.statWidget.sizeHint())
         self.xstd_value.setText("-")

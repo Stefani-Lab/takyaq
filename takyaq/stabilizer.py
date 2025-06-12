@@ -831,8 +831,6 @@ class Stabilizer(_th.Thread):
             image = self._camera.get_image()
             for idx, s in enumerate(shifts):
                 image = self._camera.get_image()
-                # roi = image[slice(*self._z_roi[0]), slice(*self._z_roi[1])]
-                # c = _np.array(_sp.ndimage.center_of_mass(roi))
                 z_position = self._locate_z_center(image)
                 c = z_position - self._initial_z_position
                 xy_data = (
@@ -873,9 +871,9 @@ class Stabilizer(_th.Thread):
         initial_xy_positions = None
         self._initial_z_position = None
         self._pos[:] = self._piezo.get_position()
+        lt = 0
+        nt = _time.monotonic()
         while not self._stop_event.is_set():
-            lt = _time.monotonic()
-            DELAY = self._period
             z_shift = 0.0
             xy_shifts = None
             # Check external events
@@ -905,14 +903,17 @@ class Stabilizer(_th.Thread):
                 self._pos[:] = self._moveto_pos
                 self._move_event.clear()
             # Tracking and stabilization starts here
+            delay = self._period - (_time.monotonic() - nt)
+            _time.sleep(max(delay, 0.001))  # be nice to other threads
+            lt = nt
+            nt = _time.monotonic()
+            t = _time.time()
             try:
                 image = self._camera.get_image()
-                t = _time.time()
                 self._last_image = image
             except Exception as e:
                 _lgr.error("Could not acquire image: %s (%s)", type(e), e)
                 image = _np.diag(_np.full(max(*self._last_image.shape), 255))
-                t = _time.time()
                 self._report(
                     t,
                     image,
@@ -974,7 +975,4 @@ class Stabilizer(_th.Thread):
                     self._move_relative_z(z_resp)
                 if self._xy_stabilization:
                     self._move_relative_xy(x_resp, y_resp)
-            nt = _time.monotonic()
-            delay = DELAY - (nt - lt)
-            _time.sleep(max(delay, 0.001))  # be nice to other threads
         _lgr.debug("Ending loop.")

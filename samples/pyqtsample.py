@@ -66,7 +66,8 @@ if __name__ == "__main__":
         _CAMERA_XY_NMPPX * 7,  # en pixeles
         _CAMERA_Z_ROTATION,
         1,  # Center position noise in pixels
-        40,
+        10,
+        1
     )
     # Mock piezo motor, replace with your own
     piezo = MockPiezo(camera)
