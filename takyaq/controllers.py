@@ -18,10 +18,10 @@ Copyright (C) 2025 Andrés Zelcer and others
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-
 import numpy as _np
 import logging as _lgn
 from typing import Optional as _Optional, Union as _Union, Tuple as _Tuple
+from takyaq.base_classes import BaseController as _BaseController
 
 
 _lgn.basicConfig()
@@ -29,7 +29,7 @@ _lgr = _lgn.getLogger(__name__)
 _lgr.setLevel(_lgn.DEBUG)
 
 
-class PIController:
+class PIController(_BaseController):
     """PI Controller."""
 
     _Kp = _np.ones((3,))
