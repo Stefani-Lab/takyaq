@@ -21,7 +21,7 @@ The module performance is shown in the [article] *Open-source Sub-Nanometer Stab
  
 ## How to install
 
-Takyaq is not yet available in PyPi. Meanwhile installation and development is managed using [Poetry].
+Takyaq is not yet available in PyPi nor Conda derived repositories. Meanwhile installation and development are managed using [Poetry].
 Clone the repository, either using `ssh`:
 ```sh
 git clone git@github.com:Stefani-Lab/takyaq.git
@@ -37,7 +37,7 @@ cd takyaq
 poetry install
 ```
 
-If you want to use the provided GUI, muy must also install some extra dependencies (PyQT and pyqtgraph):
+If you want to use the provided GUI, muy must also install some extra dependencies (PyQt and pyqtgraph):
 ```sh
 poetry install --with qt
 ```
@@ -53,7 +53,9 @@ Takyaq uses a number of open source projects to work properly:
 
 ## How to use
 
-### Module
+### Stabilization Module
+
+As the system is hardware agnostic, Pyhton objects for the camera and the piezo stage must be provided by the user. Wrappers for [pylablib] cameras are included in `takyaq.wrappers.pylablib`.
 
 Interfaces needed:
  - A camera object, that exposes a function named `get_image` and returns a single color image (a [NumPy] 2D array)
@@ -68,7 +70,9 @@ The provided GUI will use some optional extra methods if implemented. The piezo 
 
 If the Python interfaces to your camera and stage use different naming conventions or units, you should write some wrapping classes (see below).
 
-Calibration data needed:
+#### Calibration
+
+The system requires some user-provided calibration data to perform the corrective steps and to report the current performance:
  - How many nanometers each camera pixel represents in the X and Y directions.
  - How the Z reflection spot moves when the Z position changes:
    - The direction (angle between the X axis and the line where the spot moves)
@@ -76,7 +80,7 @@ Calibration data needed:
  
 The software provides a procedure to obtain the calibration data. Nevertheless, see below for calibration pitfalls.
 
-The module communicates with other modules using callbacks. The callback procedure should do its job (put the data in a queue, etc.) fast, so the latency between position corrections is short. Check the PyQt example for a basic idea.
+The stabilization module communicates with other modules (for example with a GUI) using callbacks. The callback procedure should do its job fast (put the data in a queue, etc.), so the latency between position corrections is short. Check the PyQt provided GUI for a basic idea.
 
 
 ### Stabilization strategies
@@ -97,7 +101,7 @@ Response functions are implemented as methods of “Controller” objects. The f
   - `xy_shifts`, an array of shape `(n_ROIS, 2)`. Each item of the array is the measured X and Y shift for each of the XY ROIS. If the localization of a particle failed (for example when the fitting procedure does not converge), the corresponding shifts will be `numpy.nan`, therefore the implementations must properly handle `nan` values. If XY stabilization is disabled, this parameter is `None.`  
   - `z_shift`, a float: The shift on the Z axis.
 
-Note that the frontend provided is designed around the provided PI controller, and therefore expects the controllers to expose two extra methods: `set_Kp` and `set_Ki`. Both methods receive either a single float or a collection (tuple, list or array) of three floats. These methods are called when the corresponding values are set. If a single value is received, the same value should be used for all the axis. If a collection is received, the elements correspond to the value of the constant for the X, Y and Z  in order
+Note that the provided frontend is designed around the provided PI controller, and therefore expects the controllers to expose two extra methods: `set_Kp` and `set_Ki`. Both methods receive either a single float or a collection (tuple, list or array) of three floats. These methods are called when the corresponding values are set. If a single value is received, the same value should be used for all the axis. If a collection is received, the elements correspond to the value of the constant for the X, Y and Z  in order
 
 
 ### Adapting cameras and piezos.
@@ -144,7 +148,7 @@ Making a [context manager] is recommended (it is simple and very convenient).
 The provided PyQt frontend is a fully functional example of how to use the stabilization module. For most purposes, you can use it _as is_. You must provide:
  - A camera object.
  - A piezo object.
- - Calibration values (as a `info_types.CameraInfo` object). If you do not know these values, just use a value of 1 for each one, and perform the calibration procedure reported below.
+ - Calibration values (as a `info_types.CameraInfo` object). If you do not know these values, just use a value of 1 for all, and perform the calibration procedure reported below.
 
 Once you run the program, perform the following steps:
  - Press the `Show options window` button and set a very low `Kp` value for all axis, and set all `Ki` to 0
@@ -177,6 +181,7 @@ Be careful since the pixel sizes used and determined using the provided calibrat
 ## Some design comments and pitfalls
 
  - We try to keep compatibility with Python 3.7+, to support legacy setups.
+ - The user selected period is a minimum limit: the actual period will include the camera exposure time and the overhead of data processing and data interchanging with camera and piezo stage. If this value is set to 0 (or any value smaller than camera exposure time) the system will perform position corrections as fast as possible.
  - Times are reported in seconds since the Epoch, as provided by Python's `time.time()`, since it is the most convenient (not the best) way of having the same time reference between different programs.
  - The stabilization loop runs on a different thread. It could run on a different process for efficiency (to avoid GIL issues), but most applications need to be able to move the piezo from other modules. Managing the same stage from two different processes is usually much harder than from different threads on the same process.
  - Fitting of the fiducial beads is done in multiple processes to achieve higer correction frequencies. This implies that the many processes are spawned. Objects created on module load are created on each process and might collide (open ports, etc.)
@@ -206,3 +211,4 @@ This module is distributed under GNU Affero General Public License v3.0 or later
    [black]: <https://black.readthedocs.io/en/stable/>
    [article]: <https://dx.doi.org/10.21203/rs.3.rs-6131181/v1>
    [context manager]: <https://docs.python.org/3/reference/datamodel.html#context-managers>
+   [pylablib]: <https://pylablib.readthedocs.io/en/latest/>
