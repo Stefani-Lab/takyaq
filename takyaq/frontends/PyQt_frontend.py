@@ -46,8 +46,9 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QDoubleSpinBox,
     QFileDialog,
+    QShortcut,
 )
-from PyQt5.QtGui import QDoubleValidator
+from PyQt5 import QtGui
 from .qt_utils import create_spin as _create_spin, GroupedCheckBoxes
 import pyqtgraph as _pg
 
@@ -57,6 +58,7 @@ from ..stabilizer import Stabilizer, PointInfo, ROI, CameraInfo
 
 import takyaq.base_classes as _bc
 from .pattern_GUI import PatternWindow
+
 
 _lgr = _lgn.getLogger(__name__)
 _lgr.setLevel(_lgn.DEBUG)
@@ -334,9 +336,16 @@ class Frontend(QFrame):
     def __init__(self, camera: _bc.BaseCamera, piezo: _bc.BasePiezo,
                  controller: _bc.BaseController, camera_info: _Optional[CameraInfo],
                  stabilizer: Stabilizer,
-                 *args, **kwargs):
+                 *args,
+                 publication_colors: bool = False,
+                 line_scaling: int = 1,
+                 **kwargs):
         """Init Frontend."""
         super().__init__(*args, **kwargs)
+        if publication_colors:
+            _pg.setConfigOption('background', 'w')
+            _pg.setConfigOption('foreground', 'k')
+        self._scaling = line_scaling
         self._load_config()
         self._camera = camera
         self._piezo = piezo
@@ -357,6 +366,9 @@ class Frontend(QFrame):
         self._config_window.hide()
         self._pattern_window = PatternWindow(self, stabilizer)
         self._pattern_window.hide()
+        self._pen_XY_ROI = _pg.mkPen(color="w", width=self._scaling)
+        self._capture_shortcut = QShortcut(QtGui.QKeySequence("Ctrl+S"), self)
+        self._capture_shortcut.activated.connect(self._save_screen)
 
     def _load_config(self):
         self._config = load_config()
@@ -396,11 +408,12 @@ class Frontend(QFrame):
     def reset_graphs(self, roi_len: int):
         """Reset graphs contents and adjust to number of XY ROIs."""
         neplots = len(self._x_plots)
+        individual_pen = _pg.mkPen(color=(0, 236, 255), width=self._scaling)
         if roi_len > neplots:
             self._x_plots.extend(
                 [
                     self.xyzGraph.xPlot.plot(
-                        pen="w", alpha=0.3, auto=False, connect="finite"
+                        pen=individual_pen, alpha=0.3, auto=False, connect="finite"
                     )
                     for _ in range(roi_len - neplots)
                 ]
@@ -408,7 +421,7 @@ class Frontend(QFrame):
             self._y_plots.extend(
                 [
                     self.xyzGraph.yPlot.plot(
-                        pen="w", alpha=0.3, auto=False, connect="finite"
+                        pen=individual_pen, alpha=0.3, auto=False, connect="finite"
                     )
                     for _ in range(roi_len - neplots)
                 ]
@@ -435,7 +448,7 @@ class Frontend(QFrame):
         w, h = self.lastimage.shape[0:2]
         ROIpos = (w / 2 - self._XY_ROI_SIZE / 2, h / 2 - self._XY_ROI_SIZE / 2)
         ROIsize = (self._XY_ROI_SIZE, self._XY_ROI_SIZE)
-        roi = _pg.ROI(ROIpos, ROIsize, rotatable=False)
+        roi = _pg.ROI(ROIpos, ROIsize, rotatable=False, pen=self._pen_XY_ROI)
         roi.addScaleHandle((1, 0), (0, 1), lockAspect=True)
         self.image_pi.addItem(roi)
         self._roilist.append(roi)
@@ -462,7 +475,8 @@ class Frontend(QFrame):
         w, h = self.lastimage.shape[0:2]
         ROIpos = (w / 2 - self._Z_ROI_SIZE / 2, h / 2 - self._Z_ROI_SIZE / 2)
         ROIsize = (self._Z_ROI_SIZE, self._Z_ROI_SIZE)
-        roi = _pg.ROI(ROIpos, ROIsize, pen={"color": "red", "width": 2}, rotatable=False)
+        roi = _pg.ROI(ROIpos, ROIsize, pen={"color": "red", "width": 2 * self._scaling},
+                      rotatable=False)
         roi.addScaleHandle((1, 0), (0, 1), lockAspect=True)
         self.image_pi.addItem(roi)
         self._z_ROI = roi
@@ -562,6 +576,23 @@ class Frontend(QFrame):
         self._period = delay
         self._config['period'] = delay
         self._stabilizer.set_min_period(delay)
+
+    @pyqtSlot()
+    def _save_screen(self):
+        size = self.size()
+        image = QtGui.QImage(
+            size.width() * self._scaling,
+            size.height() * self._scaling,
+            QtGui.QImage.Format_ARGB32
+            )
+        image.setDevicePixelRatio(self._scaling)
+        self.render(image)
+        base_dir = self._config['output_base_dir']
+        base_dir.mkdir(parents=True, exist_ok=True)
+        date_str = _datetime.datetime.now().isoformat(
+            timespec='seconds').replace('-', '').replace(':', '-')
+        filename = base_dir / ('capture_' + date_str + '.png')
+        image.save(str(filename))
 
     @pyqtSlot(bool)
     def _manage_exposure_set(self, checked: bool):
@@ -871,7 +902,7 @@ class Frontend(QFrame):
         numeric_layout = QGridLayout()
         numeric_gb.setLayout(numeric_layout)
         self.delay_le = QLineEdit(str(self._period))
-        self.delay_le.setValidator(QDoubleValidator(1E-3, 1., 3))
+        self.delay_le.setValidator(QtGui.QDoubleValidator(1E-3, 1., 3))
         self.set_delay_button = QPushButton('Set Period')
         self.set_delay_button.clicked.connect(self._set_delay)
         numeric_layout.addWidget(QLabel("Period / s",
@@ -946,20 +977,21 @@ class Frontend(QFrame):
         self.xyzGraph.setAntialiasing(True)
 
         # TODO: Wrap boilerplate into a function
+        average_pen = _pg.mkPen("r", width=self._scaling)
         self.xyzGraph.xPlot = self.xyzGraph.addPlot(row=0, col=0)
         self.xyzGraph.xPlot.setLabels(bottom=("Time", "s"), left=("X shift", "nm"))
         self.xyzGraph.xPlot.showGrid(x=True, y=True)
-        self.xmeanCurve = self.xyzGraph.xPlot.plot(pen="r", width=140)
+        self.xmeanCurve = self.xyzGraph.xPlot.plot(pen=average_pen, width=140)
 
         self.xyzGraph.yPlot = self.xyzGraph.addPlot(row=1, col=0)
         self.xyzGraph.yPlot.setLabels(bottom=("Time", "s"), left=("Y shift", "nm"))
         self.xyzGraph.yPlot.showGrid(x=True, y=True)
-        self.ymeanCurve = self.xyzGraph.yPlot.plot(pen="r", width=140)
+        self.ymeanCurve = self.xyzGraph.yPlot.plot(pen=average_pen, width=140)
 
         self.xyzGraph.zPlot = self.xyzGraph.addPlot(row=2, col=0)
         self.xyzGraph.zPlot.setLabels(bottom=("Time", "s"), left=("Z shift", "nm"))
         self.xyzGraph.zPlot.showGrid(x=True, y=True)
-        self.zCurve = self.xyzGraph.zPlot.plot(pen="y")
+        self.zCurve = self.xyzGraph.zPlot.plot(pen=average_pen)
 
         # self.xyzGraph.avgIntPlot = self.xyzGraph.addPlot(row=3, col=0)
         # self.xyzGraph.avgIntPlot.setLabels(
