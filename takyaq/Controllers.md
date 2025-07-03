@@ -96,8 +96,7 @@ We then calculate the `Kp` we should use. We make a copy of the array holding th
 
 Finally, we calculate the correction to be performed and clip values to the user selected maximum displacement. Notice the sign change of the return value, as we must return the desired relative movement to be performed.
 ```python
-        rv = error * Kp_to_use
-        rv = np.where(rv < self._max_disp, rv, np.sign(rv) * self._max_disp)
+        rv = np.clip(error * Kp_to_use, -self._max_disp, self._max_disp)
         return -rv
 ```
 
@@ -167,7 +166,6 @@ class ThresholdPIController(BaseController):
         Kp_to_use = self._Kp.copy()
         Kp_to_use[np.abs(error) >= self._threshold] = self._Kp_plusultra
 
-        rv = error * Kp_to_use
-        rv = np.where(rv < self._max_disp, rv, np.sign(rv) * self._max_disp)
+        rv = np.clip(error * Kp_to_use, -self._max_disp, self._max_disp)
         return -rv
 ```

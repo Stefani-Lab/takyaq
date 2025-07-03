@@ -78,6 +78,5 @@ class ThresholdPIController(BaseController):
         Kp_to_use = self._Kp.copy()
         Kp_to_use[np.abs(error) >= self._threshold] = self._Kp_plusultra
 
-        rv = error * Kp_to_use
-        rv = np.where(rv < self._max_disp, rv, np.sign(rv) * self._max_disp)
+        rv = np.clip(error * Kp_to_use, -self._max_disp, self._max_disp)
         return -rv
